@@ -1,0 +1,47 @@
+---
+# This playbook setup a cluster.
+
+- name: create instances on aws
+  remote_user: ec2-user
+  hosts: aws
+  roles:
+    - common
+
+- name: install prereq
+  remote_user: ec2-user
+  become: true
+  vars_files:
+    - vars/secrets.yml 
+  hosts:
+  - masters
+  - nodes
+  roles:
+    - prereq
+
+- name: install keys
+  remote_user: ec2-user
+  become: true
+  hosts:
+  - masters
+  - nodes
+  roles:
+    - keys
+
+- name: hosts
+  remote_user: ec2-user
+  become: true
+  vars_files:
+    - vars/secrets.yml
+  hosts:
+  - masters
+  roles:
+    - hosts_file
+
+- name: hosts
+  remote_user: ec2-user
+  become: true
+  hosts:
+  - masters
+  roles:
+    - install
+

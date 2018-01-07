@@ -1,0 +1,3 @@
+#for taging cloud config in ocp
+ocp_cluster_id: cluster001
+vol_delete_on_termination: True

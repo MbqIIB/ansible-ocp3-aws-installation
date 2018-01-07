@@ -1,0 +1,99 @@
+---
+# This role spins up a node on aws 
+
+- name: Create App Instance
+  local_action:
+    module: ec2
+    key_name: "{{ keyname }}"
+    group_id: "{{ default_sg_id }}"
+    instance_type: "{{ instance_type }}"
+    image: "{{ aim_id }}"
+    wait: yes
+    wait_timeout: 500
+    volumes:
+      - device_name: /dev/sda1
+        volume_type: gp2
+        volume_size: "{{ volume_size }}"
+    vpc_subnet_id: "{{ dmz_subnet_id }}"
+    assign_public_ip: yes
+    instance_tags: 
+      node-type: app
+    count_tag:
+      node-type: app
+    exact_count: 1
+    region: 'ap-southeast-1'
+  tags: create-app
+
+- name: get app node info
+  local_action: 
+    module: ec2_remote_facts
+    filters:
+      tag:"node-type"="app"
+    region: 'ap-southeast-1'
+  register: app 
+  tags: get-app-nodes-info
+
+- name: label app node instance
+  local_action:
+    module:  ec2_tag
+    region: ap-southeast-1
+    resource:  "{{app.instances[0].id }}"
+    state: present
+    tags:
+      Name: app-node-1
+      node-type: app
+  tags: label-app-nodes
+
+- name: Add new instance to host group
+  add_host:
+    hostname: "{{ app.instances[0].private_ip_address }}" 
+    groupname: app-servers
+
+- name: Create DB Instance
+  local_action:
+    module: ec2
+    key_name: "{{ keyname }}"
+    group_id: "{{ default_sg_id }}"
+    instance_type: "{{ instance_type }}"
+    image: "{{ aim_id }}"
+    wait: yes
+    wait_timeout: 500
+    volumes:
+      - device_name: /dev/sda1
+        volume_type: gp2
+        volume_size: "{{ volume_size }}"
+    vpc_subnet_id: "{{ dmz_subnet_id }}"
+    assign_public_ip: yes
+    instance_tags:
+      node-type: db
+    count_tag:
+      node-type: db
+    exact_count: 1
+    region: 'ap-southeast-1'
+  tags: create-db
+
+- name: get db node info
+  local_action:
+    module: ec2_remote_facts
+    filters:
+      tag:"node-type"="db"
+    region: 'ap-southeast-1'
+  register: db
+  tags: get-db-nodes-info
+
+- name: label db node instance
+  local_action:
+    module:  ec2_tag
+    region: ap-southeast-1
+    resource:  "{{db.instances[0].id }}"
+    state: present
+    tags:
+      Name: db-node-1
+      node-type: db
+  tags: label-db-nodes
+
+- name: Add new instance to host group
+  add_host:
+    hostname: "{{ db.instances[0].private_ip_address }}"    
+    groupname: db-servers
+

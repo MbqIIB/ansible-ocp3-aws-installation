@@ -1,0 +1,62 @@
+---
+# This role install the prereq for OCP v3 installtion
+
+- name: Wait for master SSH to come up
+  wait_for:
+    host: "{{ item.private_ip_address }}"
+    port: 22
+    delay: 3
+    timeout: 5
+    state: started
+  with_items: "{{ hostvars['localhost']['master'].instances }}"
+
+- name: Wait for node SSH to come up
+  wait_for:
+    host: "{{ item.private_ip_address }}"
+    port: 22
+    delay: 3
+    timeout: 5
+    state: started
+  with_items: "{{ hostvars['localhost']['worker'].instances }}"
+
+
+- name: Subscription to RHN and attach Pool
+  command: "{{ item }}"
+#  no_log: true
+  with_items:
+    - "subscription-manager register --username={{ RHNID }} --password={{ RHNPASS }}"
+    - "subscription-manager refresh"
+    - "subscription-manager attach --pool={{ RHNPOOL}}"
+  tags:
+    - rhn-sub
+
+- name: Setup Repo
+  command: "{{ item }}"
+  with_items:
+    - "subscription-manager repos --disable='*'"
+    - "subscription-manager repos --enable='rhel-7-server-rpms' --enable='rhel-7-server-extras-rpms' --enable='rhel-7-server-ose-3.7-rpms' --enable='rhel-7-fast-datapath-rpms'"
+
+- name: Install utilities packages for all nodes
+  yum:  state=present name={{ item }}
+  with_items:
+    - wget
+    - git
+    - net-tools
+    - bind-utils
+    - iptables-services
+    - bridge-utils
+    - bash-completion
+    - kexec-tools
+    - sos
+    - psacct
+#  when: inventory_hostname in groups['ose-servers-master']
+
+- name: update all
+  yum:  state=latest name=*
+
+- name: Install utils
+  yum:  state=present name=atomic-openshift-utils
+
+- name: Install docker-1.12.6
+  yum: state=present name=docker-1.12.6
+

@@ -1,0 +1,52 @@
+---
+# This role exchange the keys for the private ip address
+
+- name: Wait for master SSH to come up
+  wait_for:
+    host: "{{ item.private_ip_address }}"
+    port: 22
+    delay: 3
+    timeout: 10
+    state: started
+  with_items: "{{ hostvars['localhost']['master'].instances }}"
+
+- name: Wait for node SSH to come up
+  wait_for:
+    host: "{{ item.private_ip_address }}"
+    port: 22
+    delay: 3
+    timeout: 10
+    state: started
+  with_items: "{{ hostvars['localhost']['worker'].instances }}"
+
+- name: Generate SSH keys on Master
+  shell: ssh-keygen -b 2048 -t rsa -f /root/.ssh/id_rsa -q -N ""
+  args:
+    creates: /root/.ssh/id_rsa
+  when: inventory_hostname in groups['masters']
+
+- name: Collect key from master node
+  shell: cat ~/.ssh/id_rsa.pub
+  register: ssh_keys
+  when: inventory_hostname in groups['masters']
+  tags:
+    - deploy-keys
+
+- name: save key to local file
+  local_action: copy content={{ ssh_keys.stdout }} dest={{ pubkey }}
+  when: inventory_hostname in groups['masters']
+  tags:
+    - deploy-keys
+
+- name: Check keys
+  debug:
+    msg: "{{ ssh_keys }}"
+  tags:
+    - deploy-keys
+
+- name: Deploy keys on all servers
+  authorized_key: user=root key="{{ lookup('file', '{{ pubkey }}') }}"
+  tags:
+    - deploy-keys
+
+

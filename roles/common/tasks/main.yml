@@ -1,0 +1,163 @@
+---
+# This role spins up 1 master and 3 worker nodes
+# tag them
+# add them to host groups
+
+# master nodes
+# add master, node and infra sg
+- name: Create Master Nodes
+  local_action:
+    module: ec2
+    key_name: "{{ keyname }}"
+    group_id: [ "{{ master_sg_id }}","{{ infra_sg_id }}", "{{ node_sg_id }}" ]
+    instance_type: "{{ instance_type }}"
+    image: "{{ aim_id }}"
+    wait: yes
+    wait_timeout: 500
+    volumes:
+      - device_name: /dev/sda1
+        volume_type: gp2
+        volume_size: "{{ volume_size }}"
+        delete_on_termination: "{{ vol_delete_on_termination }}"
+        tags:
+          node-type: master
+#          kubernetes.io/cluster/"{{ cluster_id }}": "{{ cluster_id }}"
+          kubernetes.io/cluster/cluster001: cluster001
+    vpc_subnet_id: "{{ dmz_subnet_id }}"
+    assign_public_ip: yes
+    instance_tags:
+      node-type: master
+#      kubernetes.io/cluster/"{{ cluster_id }}": "{{ cluster_id }}"
+      kubernetes.io/cluster/cluster001: cluster001
+    count_tag:
+      node-type: master
+    exact_count: "{{ master_node_count}}"
+    region: 'ap-southeast-1'
+  tags: create-master
+
+# Get and register master instance info
+- name: get master node info
+  local_action:
+    module: ec2_instance_facts
+    filters:
+      "tag:node-type": "master"
+      "instance-state-name": "running"
+    region: 'ap-southeast-1'
+  register: master
+  tags: get-master-nodes-info
+
+- name: label master node instance
+  local_action:
+    module:  ec2_tag
+    region: ap-southeast-1
+    resource:  "{{ item.1.instance_id }}"
+    state: present
+    tags:
+      Name: master-node-{{ ocp_cluster_name }}-{{item.0}}
+      node-type: master
+  with_indexed_items:
+    - "{{ master.instances }}"
+  tags: label-master-nodes
+
+- name: Add new instance to host group, masters
+  add_host:
+    hostname: "{{ item.public_ip_address }}"
+    groupname: masters
+  with_items:
+    - "{{ master.instances }}"
+
+- name: Add new instance private ip to host group, masters
+  add_host:
+    hostname: "{{ item.private_ip_address }}"
+    groupname: masters-private
+  with_items:
+    - "{{ master.instances }}"
+
+# worker nodes
+# add worker, node and infra sg
+- name: Create Worker Nodes
+  local_action:
+    module: ec2
+    key_name: "{{ keyname }}"
+    group_id: [ "{{ node_sg_id }}" ]
+    instance_type: "{{ instance_type }}"
+    image: "{{ aim_id }}"
+    wait: yes
+    wait_timeout: 500
+    volumes:
+      - device_name: /dev/sda1
+        volume_type: gp2
+        volume_size: "{{ volume_size }}"
+        delete_on_termination: "{{ vol_delete_on_termination }}"
+        tags:
+          node-type: master
+#          kubernetes.io/cluster/"{{ cluster_id }}": "{{ cluster_id }}"
+          kubernetes.io/cluster/cluster001: cluster001
+    vpc_subnet_id: "{{ dmz_subnet_id }}"
+    assign_public_ip: yes
+    instance_tags:
+      node-type: worker
+#      kubernetes.io/cluster/"{{ cluster_id }}": "{{ cluster_id }}"
+      kubernetes.io/cluster/cluster001: cluster001
+    count_tag:
+      node-type: worker
+    exact_count: "{{ worker_node_count}}"
+    region: 'ap-southeast-1'
+  tags: create-worker
+
+# Get and register master instance info
+- name: get worker node info
+  local_action:
+    module: ec2_instance_facts
+    filters:
+      "tag:node-type": "worker"
+      "instance-state-name": "running"
+    region: 'ap-southeast-1'
+  register: worker
+  tags: get-worker-nodes-info
+
+- name: label worker node instance
+  local_action:
+    module:  ec2_tag
+    region: ap-southeast-1
+    resource:  "{{ item.1.instance_id }}"
+    state: present
+    tags:
+      Name: worker-node-{{ ocp_cluster_name }}-{{item.0}}
+      node-type: worker
+  with_indexed_items:
+    - "{{ worker.instances }}"
+  tags: label-worker-nodes
+
+- name: Add worker instances to host group, nodes
+  add_host:
+    hostname: "{{ item.public_ip_address }}"
+    groupname: nodes
+  with_items:
+    - "{{ worker.instances }}"
+
+- name: Add worker instances to host group, nodes
+  add_host:
+    hostname: "{{ item.private_ip_address }}"
+    groupname: nodes-private
+  with_items:
+    - "{{ worker.instances }}"
+
+- name: Wait for master SSH to come up
+  wait_for:
+    host: "{{ item.private_ip_address }}"
+    port: 22
+    delay: 5
+    timeout: 320
+    state: started
+  with_items: "{{ hostvars['localhost']['master'].instances }}"
+
+- name: Wait for node SSH to come up
+  wait_for:
+    host: "{{ item.private_ip_address }}"
+    port: 22
+    delay: 5
+    timeout: 320
+    state: started
+  with_items: "{{ hostvars['localhost']['worker'].instances }}"
+

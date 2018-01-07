@@ -1,0 +1,51 @@
+---
+# This role spins up node and set the various partition
+# test multiple group id
+
+- name: Create Instance
+  local_action:
+    module: ec2
+    key_name: "{{ keyname }}"
+    group_id: [ 'sg-f5dff091','sg-a2dff0c6', 'sg-dadff0be' ]
+    instance_type: "{{ instance_type }}"
+    image: "{{ aim_id }}"
+    wait: yes
+    wait_timeout: 500
+    volumes:
+      - device_name: /dev/sda1
+        volume_type: gp2
+        volume_size: "{{ volume_size }}"
+      - device_name: /dev/sdb
+        volume_type: gp2
+        volume_size: 5
+    vpc_subnet_id: "{{ dmz_subnet_id }}"
+    assign_public_ip: yes
+    instance_tags:
+      node-type: test
+    count_tag:
+      node-type: test
+    exact_count: 2
+    region: 'ap-southeast-1'
+  tags: create-app
+
+- name: get test node info
+  local_action:
+    module: ec2_remote_facts
+    filters:
+      tag:"node-type"="test"
+    region: 'ap-southeast-1'
+  register: test
+  tags: get-test-nodes-info
+
+- name: label test node instance
+  local_action:
+    module:  ec2_tag
+    region: ap-southeast-1
+    resource:  "{{ item.1.id }}"
+    state: present
+    tags:
+      Name: test-node-{{item.0}}
+      node-type: test
+  with_indexed_items:
+    - "{{ test.instances }}"
+  tags: label-test-nodes

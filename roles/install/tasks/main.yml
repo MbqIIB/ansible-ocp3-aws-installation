@@ -1,0 +1,9 @@
+---
+- name: turn off check
+  shell: "export ANSIBLE_HOST_KEY_CHECKING=False"
+
+- name: run ansible script
+  shell: "/bin/ansible-playbook -i /root/hosts /usr/share/ansible/openshift-ansible/playbooks/byo/config.yml -vvv"
+#  shell: "/bin/ansible-playbook -c paramiko -i /root/hosts /usr/share/ansible/openshift-ansible/playbooks/byo/config.yml -vvv"
+#  debug: msg="{{ lookup('pipe','/bin/ansible-playbook -i /root/hosts /usr/share/ansible/openshift-ansible/playbooks/byo/config.yml -vv') }}"  
+#  debug: msg="{{ lookup('pipe','ls -ltr') }}"  

@@ -1,0 +1,12 @@
+ansible-playbook -i hosts site.yml -e "jump_server_ip=54.255.191.5"  --vault-password-file ./pw.txt -v 
+
+ansible-playbook -i hosts site.yml --skip-tags "rhn-sub" -e "jump_server_ip=52.221.240.17"  --vault-password-file ./pw.txt -v 
+
+ansible-playbook -i hosts site.yml -e "jump_server_ip=52.221.240.17"  --vault-password-file ./pw.txt -v
+
+export JUMP_HOST=52.221.240.17
+
+ansible-playbook -i hosts site.yml --skip-tags "rhn-sub" -e "jump_server_ip=$JUMP_HOST"  --vault-password-file ./pw.txt -v
+
+ansible-playbook -i hosts site.yml -e "jump_server_ip=$JUMP_HOST"  --vault-password-file ./pw.txt -v
+
